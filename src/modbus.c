@@ -173,7 +173,8 @@ static int send_msg(modbus_t *ctx, uint8_t *msg, int msg_length)
     int rc;
     int i;
 
-    msg_length = ctx->backend->send_msg_pre(msg, msg_length);
+    if (ctx->isUseCRC16) /*Shilo_XyZ_*/
+		msg_length = ctx->backend->send_msg_pre(msg, msg_length);
 
     if (ctx->debug) {
         for (i = 0; i < msg_length; i++)
@@ -313,8 +314,8 @@ static int compute_data_length_after_meta(modbus_t *ctx, uint8_t *msg,
             length = 0;
         }
     }
-
-    length += ctx->backend->checksum_length;
+	if (ctx->isUseCRC16) /* ShiloXyZ */
+    	length += ctx->backend->checksum_length;
 
     return length;
 }
@@ -425,16 +426,17 @@ int _modbus_receive_msg(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
             switch (step) {
             case _STEP_FUNCTION:
                 /* Function code position */
-                length_to_read = compute_meta_length_after_function(
-                    msg[ctx->backend->header_length],
-                    msg_type);
+                length_to_read = (ctx->compute_meta_length_after_function) ? //Shilo_XyZ_
+					(ctx->compute_meta_length_after_function(msg[ctx->backend->header_length], msg_type)) :
+					(compute_meta_length_after_function(msg[ctx->backend->header_length], msg_type));
                 if (length_to_read != 0) {
                     step = _STEP_META;
                     break;
                 } /* else switches straight to the next step */
             case _STEP_META:
-                length_to_read = compute_data_length_after_meta(
-                    ctx, msg, msg_type);
+                length_to_read = (ctx->compute_data_length_after_meta) ? //Shilo_XyZ_
+					(ctx->compute_data_length_after_meta(msg, &msg_length, msg_type)) :
+					(compute_data_length_after_meta(ctx, msg, msg_type));
                 if ((msg_length + length_to_read) > (int)ctx->backend->max_adu_length) {
                     errno = EMBBADDATA;
                     _error_print(ctx, "too many data");
@@ -460,7 +462,10 @@ int _modbus_receive_msg(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
     if (ctx->debug)
         printf("\n");
 
-    return ctx->backend->check_integrity(ctx, msg, msg_length);
+    if (ctx->isUseCRC16) /* Shilo_XyZ_*/
+		return ctx->backend->check_integrity(ctx, msg, msg_length);
+    else
+		return msg_length;
 }
 
 /* Receive the request from a modbus master */
@@ -1622,6 +1627,17 @@ void modbus_mapping_free(modbus_mapping_t *mb_mapping)
     free(mb_mapping->tab_input_bits);
     free(mb_mapping->tab_bits);
     free(mb_mapping);
+}
+
+void modbus_set_use_CRC16(modbus_t *ctx, char useCRC16)
+{
+    ctx->isUseCRC16 = useCRC16;
+}
+
+void modbus_set_function_hooks(modbus_t *ctx, uint8_t (*_compute_meta_length_after_function)(int, msg_type_t), int (*_compute_data_length_after_meta)(uint8_t*, int *RessivedLength, msg_type_t))
+{
+    ctx->compute_meta_length_after_function = _compute_meta_length_after_function;
+    ctx->compute_data_length_after_meta = _compute_data_length_after_meta;
 }
 
 #ifndef HAVE_STRLCPY

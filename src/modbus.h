@@ -154,6 +154,20 @@ typedef enum
     MODBUS_ERROR_RECOVERY_PROTOCOL      = (1<<2),
 } modbus_error_recovery_mode;
 
+/*
+ ---------- Request     Indication ----------
+ | Client | ---------------------->| Server |
+ ---------- Confirmation  Response ----------
+ */
+
+typedef enum
+{
+    /* Request message on the server side */
+    MSG_INDICATION,
+    /* Request message on the client side */
+    MSG_CONFIRMATION
+} msg_type_t;
+
 EXPORT int modbus_set_slave(modbus_t* ctx, int slave);
 EXPORT int modbus_set_error_recovery(modbus_t *ctx, modbus_error_recovery_mode error_recovery);
 EXPORT void modbus_set_socket(modbus_t *ctx, int socket);
@@ -206,6 +220,10 @@ EXPORT int modbus_reply(modbus_t *ctx, const uint8_t *req,
                         int req_length, modbus_mapping_t *mb_mapping);
 EXPORT int modbus_reply_exception(modbus_t *ctx, const uint8_t *req,
                                   unsigned int exception_code);
+
+EXPORT void modbus_set_use_CRC16(modbus_t *ctx, char useCRC16);
+
+EXPORT void modbus_set_function_hooks(modbus_t *ctx, uint8_t (*compute_meta_length_after_function)(int, msg_type_t), int (*compute_data_length_after_meta)(uint8_t*, int *RessivedLength, msg_type_t));
 
 /**
  * UTILS FUNCTIONS

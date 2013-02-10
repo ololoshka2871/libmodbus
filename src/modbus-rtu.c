@@ -1058,6 +1058,7 @@ modbus_t* modbus_new_rtu(const char *device,
     }
     ctx_rtu->data_bit = data_bit;
     ctx_rtu->stop_bit = stop_bit;
+	ctx->isUseCRC16 = 1; /* Shilo_XyZ_ */
 
 #if HAVE_DECL_TIOCSRS485
     /* The RS232 mode has been set by default */
