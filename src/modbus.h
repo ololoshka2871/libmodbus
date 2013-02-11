@@ -35,11 +35,15 @@
 #include "modbus-version.h"
 
 #if defined(_WIN32)
-# if defined(DLLBUILD)
-/* define DLLBUILD when building the DLL */
-#  define EXPORT __declspec(dllexport)
+# ifdef __MINGW32__
+#  define EXPORT
 # else
-#  define EXPORT __declspec(dllimport)
+#  if defined(DLLBUILD)
+/* define DLLBUILD when building the DLL */
+#   define EXPORT __declspec(dllexport)
+#  else
+#   define EXPORT __declspec(dllimport)
+# endif
 # endif
 #else
 # define EXPORT
