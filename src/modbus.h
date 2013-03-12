@@ -227,7 +227,7 @@ EXPORT int modbus_reply_exception(modbus_t *ctx, const uint8_t *req,
 
 EXPORT void modbus_set_use_CRC16(modbus_t *ctx, char useCRC16);
 
-EXPORT void modbus_set_function_hooks(modbus_t *ctx, uint8_t (*compute_meta_length_after_function)(int, msg_type_t), int (*compute_data_length_after_meta)(uint8_t*, int *RessivedLength, msg_type_t));
+EXPORT void modbus_set_function_hooks(modbus_t *ctx, void* _compute_meta_length_after_function, void* _compute_data_length_after_meta);
 
 /**
  * UTILS FUNCTIONS

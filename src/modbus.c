@@ -427,7 +427,7 @@ int _modbus_receive_msg(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
             case _STEP_FUNCTION:
                 /* Function code position */
                 length_to_read = (ctx->compute_meta_length_after_function) ? //Shilo_XyZ_
-					(ctx->compute_meta_length_after_function(msg[ctx->backend->header_length], msg_type)) :
+					(ctx->compute_meta_length_after_function(msg[ctx->backend->header_length], msg_type, ctx)) :
 					(compute_meta_length_after_function(msg[ctx->backend->header_length], msg_type));
                 if (length_to_read != 0) {
                     step = _STEP_META;
@@ -435,7 +435,7 @@ int _modbus_receive_msg(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
                 } /* else switches straight to the next step */
             case _STEP_META:
                 length_to_read = (ctx->compute_data_length_after_meta) ? //Shilo_XyZ_
-					(ctx->compute_data_length_after_meta(msg, &msg_length, msg_type)) :
+					(ctx->compute_data_length_after_meta(msg, &msg_length, msg_type, ctx)) :
 					(compute_data_length_after_meta(ctx, msg, msg_type));
                 if ((msg_length + length_to_read) > (int)ctx->backend->max_adu_length) {
                     errno = EMBBADDATA;
@@ -1634,10 +1634,10 @@ void modbus_set_use_CRC16(modbus_t *ctx, char useCRC16)
     ctx->isUseCRC16 = useCRC16;
 }
 
-void modbus_set_function_hooks(modbus_t *ctx, uint8_t (*_compute_meta_length_after_function)(int, msg_type_t), int (*_compute_data_length_after_meta)(uint8_t*, int *RessivedLength, msg_type_t))
+void modbus_set_function_hooks(modbus_t *ctx, void* _compute_meta_length_after_function, void* _compute_data_length_after_meta)
 {
-    ctx->compute_meta_length_after_function = _compute_meta_length_after_function;
-    ctx->compute_data_length_after_meta = _compute_data_length_after_meta;
+    ctx->compute_meta_length_after_function = (Tcompute_meta_length_after_function)_compute_meta_length_after_function;
+    ctx->compute_data_length_after_meta = (Tcompute_data_length_after_meta)_compute_data_length_after_meta;
 }
 
 #ifndef HAVE_STRLCPY

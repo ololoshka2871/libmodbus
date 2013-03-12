@@ -103,6 +103,11 @@ typedef struct _modbus_backend {
     void (*free) (modbus_t *ctx);
 } modbus_backend_t;
 
+//Shilo_XyZ_
+struct _modbus;
+typedef uint8_t (*Tcompute_meta_length_after_function)(int function, msg_type_t msg_type, struct _modbus*);
+typedef int (*Tcompute_data_length_after_meta)(uint8_t *msg, int *RessivedLength, msg_type_t msg_type, struct _modbus*);
+
 struct _modbus {
     /* Slave address */
     int slave;
@@ -114,8 +119,8 @@ struct _modbus {
     struct timeval byte_timeout;
     const modbus_backend_t *backend;
     char isUseCRC16; //Shilo_XyZ_
-    uint8_t (*compute_meta_length_after_function)(int function, msg_type_t msg_type); //Shilo_XyZ_
-    int (*compute_data_length_after_meta)(uint8_t *msg, int *RessivedLength, msg_type_t msg_type); //Shilo_XyZ_
+    Tcompute_meta_length_after_function compute_meta_length_after_function; //Shilo_XyZ_
+    Tcompute_data_length_after_meta compute_data_length_after_meta; //Shilo_XyZ_
     void *backend_data;
 };
 
