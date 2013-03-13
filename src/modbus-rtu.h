@@ -23,6 +23,11 @@
 
 MODBUS_BEGIN_DECLS
 
+/*
+ * CRC16 calculation may be usefull for applications
+ */
+EXPORT uint16_t crc16(uint8_t *buffer, uint16_t buffer_length);
+ 
 /* Modbus_Application_Protocol_V1_1b.pdf Chapter 4 Section 1 Page 5
  * RS232 / RS485 ADU = 253 bytes + slave (1 byte) + CRC (2 bytes) = 256 bytes
  */
