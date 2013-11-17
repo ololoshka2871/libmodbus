@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <modbus.h>
+#include <sys/socket.h>
 
 #include "unit-test.h"
 
@@ -32,7 +33,7 @@ enum {
 
 int main(int argc, char*argv[])
 {
-    int socket;
+    int s = -1;
     modbus_t *ctx;
     modbus_mapping_t *mb_mapping;
     int rc;
@@ -124,11 +125,11 @@ int main(int argc, char*argv[])
     }
 
     if (use_backend == TCP) {
-        socket = modbus_tcp_listen(ctx, 1);
-        modbus_tcp_accept(ctx, &socket);
+        s = modbus_tcp_listen(ctx, 1);
+        modbus_tcp_accept(ctx, &s);
     } else if (use_backend == TCP_PI) {
-        socket = modbus_tcp_pi_listen(ctx, 1);
-        modbus_tcp_pi_accept(ctx, &socket);
+        s = modbus_tcp_pi_listen(ctx, 1);
+        modbus_tcp_pi_accept(ctx, &s);
     } else {
         rc = modbus_connect(ctx);
         if (rc == -1) {
@@ -175,6 +176,26 @@ int main(int argc, char*argv[])
                 printf("Reply with an invalid TID or slave\n");
                 modbus_send_raw_request(ctx, raw_req, RAW_REQ_LENGTH * sizeof(uint8_t));
                 continue;
+            } else if (MODBUS_GET_INT16_FROM_INT8(query, header_length + 1)
+                       == UT_REGISTERS_ADDRESS_SLEEP_500_MS) {
+                printf("Sleep 0.5 s before replying\n");
+                usleep(500000);
+            } else if (MODBUS_GET_INT16_FROM_INT8(query, header_length + 1)
+                       == UT_REGISTERS_ADDRESS_BYTE_SLEEP_5_MS) {
+                /* Test low level only available in TCP mode */
+                /* Catch the reply and send reply byte a byte */
+                uint8_t req[] = "\x00\x1C\x00\x00\x00\x05\xFF\x03\x02\x00\x00";
+                int req_length = 11;
+                int w_s = modbus_get_socket(ctx);
+
+                /* Copy TID */
+                req[1] = query[1];
+                for (i=0; i < req_length; i++) {
+                    printf("(%.2X)", req[i]);
+                    usleep(500);
+                    send(w_s, req + i, 1, MSG_NOSIGNAL);
+                }
+                continue;
             }
         }
 
@@ -187,10 +208,14 @@ int main(int argc, char*argv[])
     printf("Quit the loop: %s\n", modbus_strerror(errno));
 
     if (use_backend == TCP) {
-        close(socket);
+        if (s != -1) {
+            close(s);
+        }
     }
     modbus_mapping_free(mb_mapping);
     free(query);
+    /* For RTU */
+    modbus_close(ctx);
     modbus_free(ctx);
 
     return 0;

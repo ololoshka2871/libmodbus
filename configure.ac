@@ -13,7 +13,7 @@
 #
 m4_define([libmodbus_version_major], [3])
 m4_define([libmodbus_version_minor], [1])
-m4_define([libmodbus_version_micro], [0])
+m4_define([libmodbus_version_micro], [1])
 
 m4_define([libmodbus_release_status],
     [m4_if(m4_eval(libmodbus_version_minor % 2), [1], [snapshot], [release])])
@@ -72,6 +72,7 @@ AM_CONDITIONAL(OS_QNX, test "$os_qnx" = "true")
 LT_INIT([disable-static win32-dll pic-only])
 AC_CHECK_HEADERS([ \
     arpa/inet.h \
+    byteswap.h \
     errno.h \
     fcntl.h \
     limits.h \
