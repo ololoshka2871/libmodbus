@@ -28,6 +28,18 @@ MODBUS_BEGIN_DECLS
  * Shilo_XyZ_
  */
 MODBUS_API uint16_t crc16(uint8_t *buffer, uint16_t buffer_length);
+
+/*
+ * RTS/DTR control may be usefull for applications
+ * Shilo_XyZ_
+ */
+#if HAVE_DECL_TIOCM_RTS
+void _modbus_rtu_ioctl_rts(int fd, int on);
+#endif
+
+#if HAVE_DECL_TIOCM_DTR
+void _modbus_rtu_ioctl_dtr(int fd, int on);
+#endif
  
 /* Modbus_Application_Protocol_V1_1b.pdf Chapter 4 Section 1 Page 5
  * RS232 / RS485 ADU = 253 bytes + slave (1 byte) + CRC (2 bytes) = 256 bytes

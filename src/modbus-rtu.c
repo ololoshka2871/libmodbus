@@ -261,7 +261,7 @@ static int win32_ser_read(struct win32_ser *ws, uint8_t *p_msg,
 #endif
 
 #if HAVE_DECL_TIOCM_RTS
-static void _modbus_rtu_ioctl_rts(int fd, int on)
+void _modbus_rtu_ioctl_rts(int fd, int on) /* not static Shilo_XyZ_*/
 {
     int flags;
 
@@ -276,7 +276,7 @@ static void _modbus_rtu_ioctl_rts(int fd, int on)
 #endif
 
 #if HAVE_DECL_TIOCM_DTR
-static void _modbus_rtu_ioctl_dtr(int fd, int on)
+void _modbus_rtu_ioctl_dtr(int fd, int on) /* not static Shilo_XyZ_*/
 {
     int flags;
 
@@ -1220,7 +1220,7 @@ modbus_t* modbus_new_rtu(const char *device,
     }
     ctx_rtu->data_bit = data_bit;
     ctx_rtu->stop_bit = stop_bit;
-	ctx->isUseCRC16 = 1; /* Shilo_XyZ_ */
+    ctx->isUseCRC16 = 1; /* Shilo_XyZ_ */
 
 #if HAVE_DECL_TIOCSRS485
     /* The RS232 mode has been set by default */
