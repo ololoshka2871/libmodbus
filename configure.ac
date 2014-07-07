@@ -100,6 +100,9 @@ AC_CHECK_DECLS([__CYGWIN__])
 AC_FUNC_FORK
 AC_CHECK_FUNCS([accept4 getaddrinfo gettimeofday inet_ntoa memset select socket strerror strlcpy])
 
+# Required for MinGW with GCC v4.8.1 on Win7
+AC_DEFINE(WINVER, 0x0501, _)
+
 # Required for getaddrinfo (TCP PI - IPv6)
 AC_CHECK_HEADERS([winsock2.h], HAVE_WINSOCK2_H=yes)
 if test "x$HAVE_WINSOCK2_H" = "xyes"; then
@@ -111,6 +114,17 @@ fi
 AC_CHECK_DECLS([TIOCSRS485], [], [], [[#include <sys/ioctl.h>]])
 # Check for RTS flags
 AC_CHECK_DECLS([TIOCM_RTS], [], [], [[#include <sys/ioctl.h>]])
+# Check for DTR flags
+AC_CHECK_DECLS([TIOCM_DTR], [], [], [[#include <sys/ioctl.h>]])
+
+# Wtype-limits is not supported by gcc 4.2 (default on recent Mac OS X)
+my_CFLAGS="-Wall \
+-Wmissing-declarations -Wmissing-prototypes \
+-Wnested-externs -Wpointer-arith \
+-Wpointer-arith -Wsign-compare -Wchar-subscripts \
+-Wstrict-prototypes -Wshadow \
+-Wformat-security"
+AC_SUBST([my_CFLAGS])
 
 # Wtype-limits is not supported by gcc 4.2 (default on recent Mac OS X)
 my_CFLAGS="-Wall \

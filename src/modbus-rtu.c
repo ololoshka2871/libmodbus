@@ -31,7 +31,7 @@
 #include "modbus-rtu.h"
 #include "modbus-rtu-private.h"
 
-#if HAVE_DECL_TIOCSRS485 || HAVE_DECL_TIOCM_RTS
+#if HAVE_DECL_TIOCSRS485 || HAVE_DECL_TIOCM_RTS || HAVE_DECL_TIOCM_DTR
 #include <sys/ioctl.h>
 #endif
 
@@ -193,7 +193,7 @@ static void win32_ser_init(struct win32_ser *ws) {
 
 /* FIXME Try to remove length_to_read -> max_len argument, only used by win32 */
 static int win32_ser_select(struct win32_ser *ws, int max_len,
-                            struct timeval *tv) {
+                            const struct timeval *tv) {
     COMMTIMEOUTS comm_to;
     unsigned int msec = 0;
 
@@ -275,35 +275,73 @@ static void _modbus_rtu_ioctl_rts(int fd, int on)
 }
 #endif
 
+#if HAVE_DECL_TIOCM_DTR
+static void _modbus_rtu_ioctl_dtr(int fd, int on)
+{
+    int flags;
+
+    ioctl(fd, TIOCMGET, &flags);
+    if (on) {
+        flags |= TIOCM_DTR;
+    } else {
+        flags &= ~TIOCM_DTR;
+    }
+    ioctl(fd, TIOCMSET, &flags);
+}
+#endif
+
 static ssize_t _modbus_rtu_send(modbus_t *ctx, const uint8_t *req, int req_length)
 {
 #if defined(_WIN32)
     modbus_rtu_t *ctx_rtu = ctx->backend_data;
     DWORD n_bytes = 0;
-    return (WriteFile(ctx_rtu->w_ser.fd, req, req_length, &n_bytes, NULL)) ? n_bytes : -1;
+    return (WriteFile(ctx_rtu->w_ser.fd, req, req_length, &n_bytes, NULL)) ? (ssize_t)n_bytes : -1;
 #else
-#if HAVE_DECL_TIOCM_RTS
+#if !HAVE_DECL_TIOCM_RTS
+	if (ctx_rtu->rts == MODBUS_RTU_RTS_UP || ctx_rtu->rts == MODBUS_RTU_RTS_DOWN)
+		ctx_rtu->rts = MODBUS_RTU_RTS_NONE;
+#endif
+#if !HAVE_DECL_TIOCM_DTR
+	if (ctx_rtu->rts == MODBUS_RTU_DTR_UP || ctx_rtu->rts == MODBUS_RTU_DTR_DOWN)
+		ctx_rtu->rts = MODBUS_RTU_RTS_NONE;
+#endif
+
+#if HAVE_DECL_TIOCM_RTS || HAVE_DECL_TIOCM_DTR
     modbus_rtu_t *ctx_rtu = ctx->backend_data;
     if (ctx_rtu->rts != MODBUS_RTU_RTS_NONE) {
         ssize_t size;
 
         if (ctx->debug) {
-            fprintf(stderr, "Sending request using RTS signal\n");
+            fprintf(stderr, "Sending request using RTS/DTR signal\n");
         }
 
-        _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts == MODBUS_RTU_RTS_UP);
-        usleep(_MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
+		if (ctx_rtu->rts == MODBUS_RTU_RTS_UP || ctx_rtu->rts == MODBUS_RTU_RTS_DOWN) {
+			_modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts == MODBUS_RTU_RTS_UP);
+		} else  {
+			_modbus_rtu_ioctl_dtr(ctx->s, ctx_rtu->rts == MODBUS_RTU_DTR_UP);
+		}
+		if (ctx_rtu->rts != MODBUS_RTU_NONE) {
+			usleep(_MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
+		}
 
         size = write(ctx->s, req, req_length);
 
-        usleep(ctx_rtu->onebyte_time * req_length + _MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
-        _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
+		if (ctx_rtu->rts != MODBUS_RTU_NONE) {
+			usleep(ctx_rtu->onebyte_time * req_length + _MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
+		} else {
+			usleep(ctx_rtu->onebyte_time * req_length);
+		}
+		if (ctx_rtu->rts == MODBUS_RTU_RTS_UP || ctx_rtu->rts == MODBUS_RTU_RTS_DOWN) {
+			_modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
+		} else {
+			_modbus_rtu_ioctl_dtr(ctx->s, ctx_rtu->rts != MODBUS_RTU_DTR_UP);
+		}
 
         return size;
     } else {
 #endif
         return write(ctx->s, req, req_length);
-#if HAVE_DECL_TIOCM_RTS
+#if HAVE_DECL_TIOCM_RTS || HAVE_DECL_TIOCM_DTR
     }
 #endif
 #endif
@@ -952,7 +990,13 @@ int modbus_rtu_set_serial_mode(modbus_t *ctx, int mode)
     return -1;
 }
 
-int modbus_rtu_get_serial_mode(modbus_t *ctx) {
+int modbus_rtu_get_serial_mode(modbus_t *ctx)
+{
+    if (ctx == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
     if (ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTU) {
 #if HAVE_DECL_TIOCSRS485
         modbus_rtu_t *ctx_rtu = ctx->backend_data;
@@ -978,15 +1022,22 @@ int modbus_rtu_set_rts(modbus_t *ctx, int mode)
     }
 
     if (ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTU) {
-#if HAVE_DECL_TIOCM_RTS
+#if HAVE_DECL_TIOCM_RTS || HAVE_DECL_TIOCM_DTR
         modbus_rtu_t *ctx_rtu = ctx->backend_data;
 
-        if (mode == MODBUS_RTU_RTS_NONE || mode == MODBUS_RTU_RTS_UP ||
-            mode == MODBUS_RTU_RTS_DOWN) {
+        if (mode == MODBUS_RTU_NONE     || mode == MODBUS_RTU_RTS_UP ||
+            mode == MODBUS_RTU_RTS_DOWN || mode == MODBUS_RTU_DTR_UP ||
+            mode == MODBUS_RTU_DTR_DOWN ) {
             ctx_rtu->rts = mode;
 
-            /* Set the RTS bit in order to not reserve the RS485 bus */
-            _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
+            if (mode == MODBUS_RTU_RTS_UP || mode == MODBUS_RTU_RTS_DOWN) {
+                /* Set the RTS bit in order to not reserve the RS485 bus */
+                _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
+            }
+            if (mode == MODBUS_RTU_DTR_UP || mode == MODBUS_RTU_DTR_DOWN) {
+                /* Set the RTS bit in order to not reserve the RS485 bus */
+                _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_DTR_UP);
+            }
 
             return 0;
         } else {
@@ -1006,13 +1057,7 @@ int modbus_rtu_set_rts(modbus_t *ctx, int mode)
     return -1;
 }
 
-int modbus_rtu_get_rts(modbus_t *ctx)
-{
-    if (ctx == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-
+int modbus_rtu_get_rts(modbus_t *ctx) {
     if (ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTU) {
 #if HAVE_DECL_TIOCM_RTS
         modbus_rtu_t *ctx_rtu = ctx->backend_data;
@@ -1032,7 +1077,7 @@ int modbus_rtu_get_rts(modbus_t *ctx)
 
 static void _modbus_rtu_close(modbus_t *ctx)
 {
-    /* Closes the file descriptor in RTU mode */
+    /* Restore line settings and close file descriptor in RTU mode */
     modbus_rtu_t *ctx_rtu = ctx->backend_data;
 
 #if defined(_WIN32)
@@ -1140,19 +1185,26 @@ modbus_t* modbus_new_rtu(const char *device,
     modbus_t *ctx;
     modbus_rtu_t *ctx_rtu;
 
+    /* Check device argument */
+    if (device == NULL || (*device) == 0) {
+        fprintf(stderr, "The device string is empty\n");
+        errno = EINVAL;
+        return NULL;
+    }
+
+    /* Check baud argument */
+    if (baud == 0) {
+        fprintf(stderr, "The baud rate value must not be zero\n");
+        errno = EINVAL;
+        return NULL;
+    }
+
     ctx = (modbus_t *) malloc(sizeof(modbus_t));
     _modbus_init_common(ctx);
     ctx->backend = &_modbus_rtu_backend;
     ctx->backend_data = (modbus_rtu_t *) malloc(sizeof(modbus_rtu_t));
     ctx_rtu = (modbus_rtu_t *)ctx->backend_data;
-
-    /* Check device argument */
-    if (device == NULL || (*device) == 0) {
-        fprintf(stderr, "The device string is empty\n");
-        modbus_free(ctx);
-        errno = EINVAL;
-        return NULL;
-    }
+    ctx_rtu->device = NULL;
 
     /* Device name and \0 */
     ctx_rtu->device = (char *) malloc((strlen(device) + 1) * sizeof(char));
