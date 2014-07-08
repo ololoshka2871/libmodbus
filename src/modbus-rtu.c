@@ -32,7 +32,12 @@
 #include "modbus-rtu-private.h"
 
 #if HAVE_DECL_TIOCSRS485 || HAVE_DECL_TIOCM_RTS || HAVE_DECL_TIOCM_DTR
+#ifndef WIN32
 #include <sys/ioctl.h>
+#else
+#include <windows.h>
+#include <tchar.h>
+#endif
 #endif
 
 #if HAVE_DECL_TIOCSRS485
@@ -261,32 +266,68 @@ static int win32_ser_read(struct win32_ser *ws, uint8_t *p_msg,
 #endif
 
 #if HAVE_DECL_TIOCM_RTS
-void _modbus_rtu_ioctl_rts(int fd, int on) /* not static Shilo_XyZ_*/
+void _modbus_rtu_ioctl_rts(modbus_t *ctx, int on) /* not static Shilo_XyZ_*/
 {
+#if !defined(_WIN32)
     int flags;
 
-    ioctl(fd, TIOCMGET, &flags);
+    ioctl(ctx->s, TIOCMGET, &flags);
     if (on) {
         flags |= TIOCM_RTS;
     } else {
         flags &= ~TIOCM_RTS;
     }
-    ioctl(fd, TIOCMSET, &flags);
+    ioctl(ctx->s, TIOCMSET, &flags);
+#else
+	// basic support control RTS by WINAPI
+    HANDLE h = ((modbus_rtu_t *)ctx->backend_data)->w_ser.fd;
+    int res = EscapeCommFunction(h, on ? SETRTS : CLRRTS);
+    if (!res && ctx->debug) {
+        TCHAR   lpBuffer[256] = _T("?");
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,                 // It´s a system error
+                         NULL,                                      // No string to be formatted needed
+                         GetLastError(),                               // Hey Windows: Please explain this error!
+                         MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),  // Do it in the standard language
+                         lpBuffer,              // Put the message here
+                         256,                     // Number of bytes to store the message
+                         NULL);
+        fprintf(stderr, "Error set RTS EscapeCommFunction(): %s",
+                lpBuffer);
+    }
+#endif
 }
 #endif
 
 #if HAVE_DECL_TIOCM_DTR
-void _modbus_rtu_ioctl_dtr(int fd, int on) /* not static Shilo_XyZ_*/
+void _modbus_rtu_ioctl_dtr(modbus_t *ctx, int on) /* not static Shilo_XyZ_*/
 {
+#if !defined(_WIN32)
     int flags;
 
-    ioctl(fd, TIOCMGET, &flags);
+    ioctl(ctx->s, TIOCMGET, &flags);
     if (on) {
         flags |= TIOCM_DTR;
     } else {
         flags &= ~TIOCM_DTR;
     }
-    ioctl(fd, TIOCMSET, &flags);
+    ioctl(ctx->s, TIOCMSET, &flags);
+#else
+    // basic support control DTR by WINAPI
+    HANDLE h = ((modbus_rtu_t *)ctx->backend_data)->w_ser.fd;
+    int res = EscapeCommFunction(h, on ? SETDTR : CLRDTR);
+    if (!res && ctx->debug) {
+        TCHAR   lpBuffer[256] = _T("?");
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,                 // It´s a system error
+                         NULL,                                      // No string to be formatted needed
+                         GetLastError(),                               // Hey Windows: Please explain this error!
+                         MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT),  // Do it in the standard language
+                         lpBuffer,              // Put the message here
+                         256,                     // Number of bytes to store the message
+                         NULL);
+        fprintf(stderr, "Error set DTR EscapeCommFunction(): %s",
+                lpBuffer);
+    }
+#endif
 }
 #endif
 
@@ -316,9 +357,9 @@ static ssize_t _modbus_rtu_send(modbus_t *ctx, const uint8_t *req, int req_lengt
         }
 
 		if (ctx_rtu->rts == MODBUS_RTU_RTS_UP || ctx_rtu->rts == MODBUS_RTU_RTS_DOWN) {
-			_modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts == MODBUS_RTU_RTS_UP);
+			_modbus_rtu_ioctl_rts(ctx, ctx_rtu->rts == MODBUS_RTU_RTS_UP);
 		} else  {
-			_modbus_rtu_ioctl_dtr(ctx->s, ctx_rtu->rts == MODBUS_RTU_DTR_UP);
+			_modbus_rtu_ioctl_dtr(ctx, ctx_rtu->rts == MODBUS_RTU_DTR_UP);
 		}
 		if (ctx_rtu->rts != MODBUS_RTU_NONE) {
 			usleep(_MODBUS_RTU_TIME_BETWEEN_RTS_SWITCH);
@@ -332,9 +373,9 @@ static ssize_t _modbus_rtu_send(modbus_t *ctx, const uint8_t *req, int req_lengt
 			usleep(ctx_rtu->onebyte_time * req_length);
 		}
 		if (ctx_rtu->rts == MODBUS_RTU_RTS_UP || ctx_rtu->rts == MODBUS_RTU_RTS_DOWN) {
-			_modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
+			_modbus_rtu_ioctl_rts(ctx, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
 		} else {
-			_modbus_rtu_ioctl_dtr(ctx->s, ctx_rtu->rts != MODBUS_RTU_DTR_UP);
+			_modbus_rtu_ioctl_dtr(ctx, ctx_rtu->rts != MODBUS_RTU_DTR_UP);
 		}
 
         return size;
@@ -610,6 +651,14 @@ static int _modbus_rtu_connect(modbus_t *ctx)
 
     /* Don't want errors to be blocking */
     dcb.fAbortOnError = FALSE;
+
+#if HAVE_DECL_TIOCM_RTS
+    dcb.fRtsControl = RTS_CONTROL_ENABLE;
+#endif
+
+#if HAVE_DECL_TIOCM_DTR
+    dcb.fDtrControl = DTR_CONTROL_ENABLE;
+#endif
 
     /* Setup port */
     if (!SetCommState(ctx_rtu->w_ser.fd, &dcb)) {
@@ -1032,11 +1081,11 @@ int modbus_rtu_set_rts(modbus_t *ctx, int mode)
 
             if (mode == MODBUS_RTU_RTS_UP || mode == MODBUS_RTU_RTS_DOWN) {
                 /* Set the RTS bit in order to not reserve the RS485 bus */
-                _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
+                _modbus_rtu_ioctl_rts(ctx, ctx_rtu->rts != MODBUS_RTU_RTS_UP);
             }
             if (mode == MODBUS_RTU_DTR_UP || mode == MODBUS_RTU_DTR_DOWN) {
                 /* Set the RTS bit in order to not reserve the RS485 bus */
-                _modbus_rtu_ioctl_rts(ctx->s, ctx_rtu->rts != MODBUS_RTU_DTR_UP);
+                _modbus_rtu_ioctl_rts(ctx, ctx_rtu->rts != MODBUS_RTU_DTR_UP);
             }
 
             return 0;

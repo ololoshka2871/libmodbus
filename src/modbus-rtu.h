@@ -34,11 +34,11 @@ MODBUS_API uint16_t crc16(uint8_t *buffer, uint16_t buffer_length);
  * Shilo_XyZ_
  */
 #if HAVE_DECL_TIOCM_RTS
-void _modbus_rtu_ioctl_rts(int fd, int on);
+void _modbus_rtu_ioctl_rts(modbus_t *ctx, int on);
 #endif
 
 #if HAVE_DECL_TIOCM_DTR
-void _modbus_rtu_ioctl_dtr(int fd, int on);
+void _modbus_rtu_ioctl_dtr(modbus_t *ctx, int on);
 #endif
  
 /* Modbus_Application_Protocol_V1_1b.pdf Chapter 4 Section 1 Page 5

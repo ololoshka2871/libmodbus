@@ -112,10 +112,22 @@ fi
 
 # Check for RS485 support (Linux kernel version 2.6.28+)
 AC_CHECK_DECLS([TIOCSRS485], [], [], [[#include <sys/ioctl.h>]])
-# Check for RTS flags
-AC_CHECK_DECLS([TIOCM_RTS], [], [], [[#include <sys/ioctl.h>]])
-# Check for DTR flags
-AC_CHECK_DECLS([TIOCM_DTR], [], [], [[#include <sys/ioctl.h>]])
+
+
+case "${host_os}" in
+  mingw*|windows*|winnt)
+    AC_DEFINE(HAVE_DECL_TIOCM_RTS, 1,
+              [HAVE_DECL_TIOCM_RTS is set.])
+	AC_DEFINE(HAVE_DECL_TIOCM_DTR, 1,
+              [HAVE_DECL_TIOCM_DTR is set.])
+    ;;
+  *)
+    # Check for RTS flags
+	AC_CHECK_DECLS([TIOCM_RTS], [], [], [[#include <sys/ioctl.h>]])
+	# Check for DTR flags
+	AC_CHECK_DECLS([TIOCM_DTR], [], [], [[#include <sys/ioctl.h>]])
+   ;;
+esac
 
 # Wtype-limits is not supported by gcc 4.2 (default on recent Mac OS X)
 my_CFLAGS="-Wall \
