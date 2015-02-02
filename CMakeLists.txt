@@ -1,20 +1,17 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.0)
 
-PROJECT(LIBMODBUS-ANDROID)
+PROJECT(libmodbus)
 
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR})
 SET(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR})
 
-INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
-
-SET(ANDROID_NDK $ENV{ANDROID_NDK})
-MESSAGE(STATUS "ANDROID_NDK : ${ANDROID_NDK}")
-
-# crystax sdk fix
-LINK_DIRECTORIES(${LINK_DIRECTORIES} ${ANDROID_NDK}/sources/crystax/empty/arm)
+INCLUDE_DIRECTORIES(
+	${PROJECT_SOURCE_DIR}
+	${PROJECT_SOURCE_DIR}/src/win32
+	)
 
 SET(HEADER_FILES
-    config.h
+    src/win32/config.h
     src/modbus.h
     src/modbus-private.h 
     src/modbus-rtu.h
@@ -31,6 +28,16 @@ SET(SOURCE_FILES
 
 ADD_LIBRARY(modbus ${HEADER_FILES} ${SOURCE_FILES})
 
+#------------------------------------------------------------------------------
+add_custom_command(
+    OUTPUT ${PROJECT_SOURCE_DIR}/src/win32/config.h
+    COMMAND cd ${PROJECT_SOURCE_DIR}/src/win32 && cscript configure.js
+	)
+	
+set_target_properties(modbus PROPERTIES LIBRARY_OUTPUT_DIRECTORY d:/tmp )
+set_target_properties(modbus PROPERTIES LIBRARY_OUTPUT_DIRECTORY_DEBUG d:/tmp )
+set_target_properties(modbus PROPERTIES LIBRARY_OUTPUT_DIRECTORY_RELEASE d:/tmp )
+    
 #------------------------------------------------------------------------------
 
 INSTALL(FILES src/modbus.h DESTINATION include/modbus)
