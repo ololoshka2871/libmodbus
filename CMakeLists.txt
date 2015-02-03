@@ -9,6 +9,8 @@ INCLUDE_DIRECTORIES(
 	${PROJECT_SOURCE_DIR}
 	${PROJECT_SOURCE_DIR}/src/win32
 	)
+	
+add_definitions(-DDLLBUILD)
 
 SET(HEADER_FILES
     src/win32/config.h
