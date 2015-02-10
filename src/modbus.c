@@ -1639,6 +1639,9 @@ void _modbus_init_common(modbus_t *ctx)
 
     ctx->byte_timeout.tv_sec = 0;
     ctx->byte_timeout.tv_usec = _BYTE_TIMEOUT;
+
+    ctx->compute_data_length_after_meta = NULL;
+    ctx->compute_meta_length_after_function = NULL;
 }
 
 /* Define the slave number */
