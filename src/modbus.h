@@ -240,8 +240,13 @@ MODBUS_API int modbus_reply_exception(modbus_t *ctx, const uint8_t *req,
                                       unsigned int exception_code);
 
 MODBUS_API void modbus_set_use_CRC16(modbus_t *ctx, char useCRC16);
+MODBUS_API char modbus_get_use_CRC16(modbus_t *ctx);
 
-MODBUS_API void modbus_set_function_hooks(modbus_t *ctx, void* _compute_meta_length_after_function, void* _compute_data_length_after_meta);
+MODBUS_API void modbus_set_function_hooks(modbus_t *ctx,
+                                          void* _compute_meta_length_after_function,
+                                          void* _compute_data_length_after_meta);
+MODBUS_API void* modbus_get_meta_hook(modbus_t *ctx);
+MODBUS_API void* modbus_get_function_hook(modbus_t *ctx);
 
 /**
  * UTILS FUNCTIONS

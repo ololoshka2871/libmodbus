@@ -1889,10 +1889,25 @@ void modbus_set_use_CRC16(modbus_t *ctx, char useCRC16)
     ctx->isUseCRC16 = useCRC16;
 }
 
+char modbus_get_use_CRC16(modbus_t *ctx)
+{
+    return ctx->isUseCRC16;
+}
+
 void modbus_set_function_hooks(modbus_t *ctx, void* _compute_meta_length_after_function, void* _compute_data_length_after_meta)
 {
     ctx->compute_meta_length_after_function = (Tcompute_meta_length_after_function)_compute_meta_length_after_function;
     ctx->compute_data_length_after_meta = (Tcompute_data_length_after_meta)_compute_data_length_after_meta;
+}
+
+void* modbus_get_meta_hook(modbus_t *ctx)
+{
+    return ctx->compute_data_length_after_meta;
+}
+
+void* modbus_get_function_hook(modbus_t *ctx)
+{
+    return ctx->compute_meta_length_after_function;
 }
 
 #ifndef HAVE_STRLCPY
